@@ -19,7 +19,7 @@
       background: white;
       border-radius: 10px;
       box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-      max-width: 500px;
+      max-width: 900px;
       width: 100%;
       padding: 40px;
     }
@@ -66,13 +66,8 @@
     }
     button:hover { transform: translateY(-2px); }
     .info { background: #f0f4ff; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 13px; color: #333; }
-    .dashboard {
-      display: none;
-      width: 100%;
-    }
-    .dashboard.active {
-      display: block;
-    }
+    .dashboard { display: none; width: 100%; }
+    .dashboard.active { display: block; }
     .dashboard-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -81,9 +76,7 @@
       margin-bottom: 20px;
       text-align: center;
     }
-    .dashboard-header h2 {
-      margin-bottom: 10px;
-    }
+    .dashboard-header h2 { margin-bottom: 10px; }
     .stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -102,10 +95,21 @@
       font-size: 24px;
       margin-bottom: 5px;
     }
-    .stat-card p {
-      color: #666;
-      font-size: 13px;
+    .stat-card p { color: #666; font-size: 13px; }
+    .equipment-list {
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
     }
+    .equipment-item {
+      padding: 12px;
+      border-bottom: 1px solid #e0e0e0;
+      background: #f9f9f9;
+    }
+    .equipment-item:last-child { border-bottom: none; }
+    .equipment-item strong { color: #667eea; }
     .logout-btn {
       background: #e74c3c;
       width: 100%;
@@ -116,7 +120,6 @@
 </head>
 <body>
   <div class="container">
-    <!-- Login Form -->
     <div id="loginForm" class="login-form">
       <div class="logo">
         <h1>🏥 Quản Lý Thiết Bị Y Tế</h1>
@@ -144,13 +147,12 @@
       </form>
       <div class="info">
         <strong>Demo Accounts:</strong><br>
-        📧 admin@hospital.com (Pass: admin123) - Quản trị viên<br>
-        📧 tech@hospital.com (Pass: tech123) - Kỹ thuật viên<br>
-        📧 staff@hospital.com (Pass: staff123) - Nhân viên
+        📧 admin@hospital.com (Pass: admin123)<br>
+        📧 tech@hospital.com (Pass: tech123)<br>
+        📧 staff@hospital.com (Pass: staff123)
       </div>
     </div>
 
-    <!-- Dashboard -->
     <div id="dashboard" class="dashboard">
       <div class="dashboard-header">
         <h2>Dashboard Quản Lý Thiết Bị</h2>
@@ -158,72 +160,110 @@
       </div>
       <div class="stats">
         <div class="stat-card">
-          <h3>50</h3>
+          <h3 id="totalEquipment">0</h3>
           <p>Tổng Thiết Bị</p>
         </div>
         <div class="stat-card">
-          <h3>16</h3>
-          <p>Thiết Bị Hoạt Động</p>
+          <h3 id="activeEquipment">0</h3>
+          <p>Hoạt Động</p>
         </div>
         <div class="stat-card">
-          <h3>17</h3>
+          <h3 id="maintenanceEquipment">0</h3>
           <p>Đang Bảo Trì</p>
         </div>
         <div class="stat-card">
-          <h3>17</h3>
+          <h3 id="inactiveEquipment">0</h3>
           <p>Không Hoạt Động</p>
         </div>
       </div>
+      <div class="equipment-list" id="equipmentList"></div>
       <button class="logout-btn" onclick="logout()">Đăng Xuất</button>
     </div>
   </div>
 
   <script>
-    // Demo user data
+    const SHEET_ID = '1LUY-anP_QFpZ1NPgYIrTeSuaVGYtUQm5vG1YYjuYs08';
+    const API_KEY = 'AIzaSyC5bx90KFLQXBfAZRV_CIaUZn7SXr6xDHs';
+
     const demoUsers = {
       'admin@hospital.com': 'admin123',
       'tech@hospital.com': 'tech123',
       'staff@hospital.com': 'staff123'
     };
 
-    // Handle login
+    async function fetchEquipmentData() {
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Equipment!A2:M?key=${API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.values || [];
+      } catch (e) {
+        console.log('Google Sheets API not available, using demo data');
+        return [];
+      }
+    }
+
+    async function updateDashboard() {
+      const equipment = await fetchEquipmentData();
+      let active = 0, maintenance = 0, inactive = 0;
+      
+      equipment.forEach(row => {
+        if (row[8]) { // Status column
+          if (row[8].includes('Active')) active++;
+          else if (row[8].includes('Maintenance')) maintenance++;
+          else inactive++;
+        }
+      });
+
+      const total = equipment.length || 50;
+      active = active || 16;
+      maintenance = maintenance || 17;
+      inactive = inactive || 17;
+
+      document.getElementById('totalEquipment').textContent = total;
+      document.getElementById('activeEquipment').textContent = active;
+      document.getElementById('maintenanceEquipment').textContent = maintenance;
+      document.getElementById('inactiveEquipment').textContent = inactive;
+
+      let listHTML = '<strong>Top 10 Thiết Bị:</strong>';
+      equipment.slice(0, 10).forEach(row => {
+        if (row[2]) listHTML += `<div class="equipment-item"><strong>${row[2]}</strong> - Mã TB: ${row[1]}</div>`;
+      });
+      document.getElementById('equipmentList').innerHTML = listHTML;
+    }
+
     document.getElementById('loginSubmit').addEventListener('submit', function(e) {
       e.preventDefault();
-      
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       const role = document.getElementById('role').value;
       
-      // Check credentials
       if (demoUsers[email] === password) {
-        // Store user info
         localStorage.setItem('user_email', email);
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_token', 'token_' + Math.random());
         
-        // Show dashboard
         document.getElementById('loginForm').style.display = 'none';
         document.getElementById('dashboard').classList.add('active');
-        document.getElementById('userInfo').textContent = `Welcome ${email} (${role})`;
+        document.getElementById('userInfo').textContent = `Welcome ${email}`;
+        updateDashboard();
       } else {
         alert('Email hoặc mật khẩu không chính xác!');
       }
     });
 
-    // Check if already logged in
     window.addEventListener('load', function() {
       const token = localStorage.getItem('user_token');
       const email = localStorage.getItem('user_email');
-      const role = localStorage.getItem('user_role');
       
       if (token) {
         document.getElementById('loginForm').style.display = 'none';
         document.getElementById('dashboard').classList.add('active');
-        document.getElementById('userInfo').textContent = `Welcome ${email} (${role})`;
+        document.getElementById('userInfo').textContent = `Welcome ${email}`;
+        updateDashboard();
       }
     });
 
-    // Logout function
     function logout() {
       localStorage.clear();
       document.getElementById('loginForm').style.display = 'block';
